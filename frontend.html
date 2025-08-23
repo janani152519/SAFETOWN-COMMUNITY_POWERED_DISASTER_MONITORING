@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>⚠ SafeTown Live — Alerts, Post & Leaderboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <style>
+    body.dark {
+      background: #232938 !important;
+      color: #fff !important;
+    }
+    .carousel {
+      overflow: hidden;
+      position: relative;
+      height: 140px;
+      background: linear-gradient(90deg, #ff7eb9, #7ec8ff);
+      user-select: none;
+    }
+    .slides {
+      display: flex;
+      transition: transform 0.5s cubic-bezier(0.22, 0.68, 0.62, 1.05);
+    }
+    .slide {
+      min-width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      height: 140px;
+      user-select: none;
+    }
+    .arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: white;
+      padding: 12px;
+      border-radius: 99px;
+      cursor: pointer;
+      z-index: 10;
+      user-select: none;
+    }
+    .arrow-left {
+      left: 6px;
+    }
+    .arrow-right {
+      right: 6px;
+    }
+    .dots {
+      position: absolute;
+      bottom: 12px;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      z-index: 20;
+      user-select: none;
+    }
+    .dot {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.18);
+      cursor: pointer;
+      user-select: none;
+    }
+    .dot.active {
+      background: #222;
+    }
+    .prep-tips-panel {
+      transition: max-height 0.3s ease, padding 0.3s ease;
+      overflow: hidden;
+      max-height: 0;
+      background: rgba(255, 255, 255, 0.95);
+      color: #222;
+      border-radius: 0 0 10px 10px;
+      padding: 0 18px;
+      margin-top: -8px;
+    }
+    body.dark .prep-tips-panel {
+      background: rgba(22, 24, 39, 0.95);
+      color: #d1d5db;
+    }
+    .prep-visible {
+      max-height: 200px;
+      padding: 18px;
+    }
+    #toast {
+      position: fixed;
+      bottom: 18px;
+      right: 18px;
+      padding: 14px 22px;
+      border-radius: 14px;
+      display: none;
+      font-weight: 700;
+      background: linear-gradient(90deg, #ff7eb9, #7ec8ff);
+      color: #222;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.22);
+      z-index: 110;
+      user-select: none;
+    }
+    .bulletin {
+      font-size: 2.1rem;
+      color: red;
+      font-weight: 900;
+      background: #111;
+      padding: 3rem;
+      border-radius: 20px;
+      max-width: 70vw;
+      text-align: center;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 font-sans">
+
+<!-- Carousel for Alerts -->
+<div class="carousel" id="carousel">
+  <div class="slides" id="slides"></div>
+  <div class="arrow arrow-left" id="prev">&#8592;</div>
+  <div class="arrow arrow-right" id="next">&#8594;</div>
+  <div class="dots" id="dots"></div>
+</div>
+
+<!-- Navigation Header -->
+<header class="flex flex-wrap items-center justify-between px-6 py-3 bg-gray-800 shadow-lg gap-2">
+  <div class="flex items-center gap-2 flex-shrink-0">
+    <span class="text-3xl">⚠</span>
+    <span class="font-black text-xl tracking-wide">SafeTown</span>
+  </div>
+  <nav class="flex gap-4 font-semibold text-lg flex-wrap items-center flex-grow max-w-full">
+    <button id="btnAlerts" class="hover:text-yellow-400 whitespace-nowrap px-4 py-2 rounded bg-gray-700 text-white">Live Alerts</button>
+    <button id="btnPost" class="hover:text-yellow-400 whitespace-nowrap px-4 py-2 rounded bg-gray-700 text-white">Post Alert</button>
+    <button id="btnPrev" class="hover:text-yellow-400 whitespace-nowrap px-4 py-2 rounded bg-gray-700 text-white">Previous Info</button>
+    <button id="btnLeaderboard" class="hover:text-yellow-400 whitespace-nowrap px-4 py-2 rounded bg-gray-700 text-white">Leaderboard</button>
+    <button id="bulletinBtn" class="bg-red-500 text-white px-4 py-1.5 rounded-full font-bold shadow-md ml-auto whitespace-nowrap">Bulletin Board</button>
+    <button id="darkToggle" class="bg-gray-700 text-white rounded-full px-4 py-1 hover:bg-gray-600 flex items-center gap-1 whitespace-nowrap">🌙 Dark Mode</button>
+    <button id="loginHeaderBtn" class="bg-green-500 text-white px-4 py-1 rounded-full font-bold whitespace-nowrap">👤 Login</button>
+  </nav>
+</header>
+
+<!-- Bulletin Modal -->
+<div id="bulletinModal" class="hidden fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50">
+  <div class="bulletin" id="bulletinScroll" tabindex="0">
+    🚨 CRITICAL: Cyclone Expected – East Zone <br />
+    🚨 POWER OUTAGE — North Zone <br />
+    🚨 BRIDGE COLLAPSE — River Bank <br />
+    🚨 FLOOD WARNING — West Sector <br />
+  </div>
+  <button id="exitBulletin" class="mt-8 text-xl px-8 py-3 bg-yellow-400 rounded-full font-black shadow-lg">Exit Bulletin</button>
+</div>
+
+<!-- Login Modal -->
+<div id="loginModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+  <div class="bg-gray-800 p-8 rounded-xl shadow-lg flex flex-col gap-4 w-80">
+    <h2 class="text-xl font-black text-white text-center">👤 Login</h2>
+    <input id="loginName" type="text" placeholder="Enter your name" class="px-4 py-3 rounded bg-gray-200 text-black font-bold" />
+    <input id="password" type="text" placeholder="Enter your password" class="px-4 py-3 rounded bg-gray-200 text-black font-bold" />
+    <button id="loginBtn" class="py-3 px-6 bg-yellow-400 text-black rounded font-black">Login</button>
+    <button id="closeLogin" class="py-3 px-6 bg-red-500 text-white rounded font-bold">Close</button>
+  </div>
+</div>
+
+<!-- Notification Toggle Button -->
+<button id="notifToggleBtn" class="fixed bottom-6 left-6 bg-blue-500 text-white px-4 py-3 rounded-full font-bold shadow-lg z-50">
+  🔔 Notifications Enabled
+</button>
+
+<!-- Broadcast Notification Button (hidden by default) -->
+<button id="notifyBtn" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-black px-4 py-3 rounded-full font-bold shadow-lg z-50 hidden">
+  📢 Broadcast Notification
+</button>
+
+<!-- Toast Notification -->
+<div id="toast" style="position:fixed; bottom:80px; left:20px; background:#3b82f6; color:white; padding:10px 20px; border-radius:10px; display:none; z-index:10000; user-select:none;"></div>
+
+<!-- Main Content -->
+<div class="max-w-6xl mx-auto mt-9 px-3">
+  <!-- Live Alerts Tab -->
+  <div id="alertsTab">
+    <h2 class="text-2xl font-black mb-3">🌟 Live Alert Feed + Map</h2>
+    <div id="alertsList" class="flex flex-col gap-6 mb-6"></div>
+    <div id="map" class="rounded-lg shadow-lg" style="height: 350px"></div>
+  </div>
+
+  <!-- Post Alert Tab -->
+  <div id="postTab" class="hidden">
+    <h2 class="text-xl font-black mb-4">🚨 Post New Alert</h2>
+    <div class="bg-gray-800 rounded-xl shadow p-6 mb-4 flex flex-col gap-3 max-w-lg">
+      <input id="hostName" class="px-4 py-3 rounded bg-gray-200 text-black font-bold" placeholder="Host Name (your name)" />
+      <input id="alertType" class="px-4 py-3 rounded bg-gray-200 text-black font-bold" placeholder="Type (any alert type allowed)" />
+      <input id="alertTitle" class="px-4 py-3 rounded bg-gray-200 text-black font-bold" placeholder="Alert Title e.g. East Coastal Zone" />
+      <select id="alertSeverity" class="px-4 py-3 rounded font-bold bg-gray-200 text-black">
+        <option value="Critical">Critical</option>
+        <option value="Warning">Warning</option>
+        <option value="All Clear">All Clear</option>
+      </select>
+      <input id="alertTips" class="px-4 py-3 rounded bg-gray-200 text-black font-bold" placeholder="Preparedness Tips" />
+      <button id="postBtn" class="py-3 px-6 bg-yellow-400 text-black text-lg rounded font-black mt-2">Post & Add</button>
+    </div>
+  </div>
+
+  <!-- Previous Info Tab -->
+  <div id="prevTab" class="hidden space-y-6 px-4">
+    <h2 class="text-xl font-white mb-6 text-white">📜 Previous Disaster Info</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-white rounded-xl shadow-lg p-5 flex flex-col justify-between">
+        <div class="text-lg font-bold mb-2 text-black">2021 Flood — Major impact in South Tirupur</div>
+        <div class="flex items-center gap-2 text-green-600 font-semibold">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span class="text-black">Solved</span>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-lg p-5 flex flex-col justify-between">
+        <div class="text-lg font-bold mb-2 text-black">2019 Cyclone Gaja — High wind damage</div>
+        <div class="flex items-center gap-2 text-red-600 font-semibold">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          <span class="text-black">Not Solved</span>
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-lg p-5 flex flex-col justify-between">
+        <div class="text-lg font-bold mb-2 text-black">2017 Power Outage — 48 hours blackout</div>
+        <div class="flex items-center gap-2 text-green-600 font-semibold">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <span class="text-black">Solved</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard Tab -->
+  <div id="leaderboardTab" class="hidden">
+    <h2 class="text-2xl font-black mb-3">🏆 Good Citizen Leaderboard</h2>
+    <ul id="leaderboardList" class="bg-gray-800 p-6 rounded-xl space-y-4 text-lg font-bold"></ul>
+  </div>
+</div>
+
+<script>
+  // Carousel setup
+  const slides = [
+    "⚡ LIVE: Cyclone Alert East Coastal Zone",
+    "🛑 CRITICAL: Bridge Collapse – River Bank",
+    "⚡ Power Outage — North Sector",
+    "🌊 Flood Alert — West Sector",
+  ];
+  const slideEls = document.getElementById("slides");
+  const dotsWrap = document.getElementById("dots");
+  let idx = 0, n = slides.length, timer;
+  function renderCarousel() {
+    slideEls.innerHTML = slides.map(s => `<div class="slide">${s}</div>`).join("");
+    dotsWrap.innerHTML = "";
+    for (let i = 0; i < n; i++) {
+      let d = document.createElement("div");
+      d.className = "dot" + (i === idx ? " active" : "");
+      d.onclick = () => {
+        idx = i;
+        updateCarousel();
+        resetCarousel();
+      };
+      dotsWrap.appendChild(d);
+    }
+  }
+  function updateCarousel() {
+    slideEls.style.transform = `translateX(-${idx * 100}%)`;
+    [...dotsWrap.children].forEach((d, i) =>
+      d.classList.toggle("active", i == idx)
+    );
+  }
+  function nextSlide() {
+    idx = (idx + 1) % n;
+    updateCarousel();
+  }
+  function prevSlide() {
+    idx = (idx - 1 + n) % n;
+    updateCarousel();
+  }
+  function startCarousel() {
+    timer = setInterval(() => {
+      nextSlide();
+    }, 3300);
+  }
+  function stopCarousel() {
+    clearInterval(timer);
+  }
+  function resetCarousel() {
+    stopCarousel();
+    startCarousel();
+  }
+  document.getElementById("next").onclick = () => {
+    nextSlide();
+    resetCarousel();
+  };
+  document.getElementById("prev").onclick = () => {
+    prevSlide();
+    resetCarousel();
+  };
+  slideEls.ontouchstart = (e) => {
+    window._x0 = e.touches[0].clientX;
+  };
+  slideEls.ontouchend = (e) => {
+    let dx = e.changedTouches[0].clientX - window._x0;
+    if (dx > 40) prevSlide();
+    else if (dx < -40) nextSlide();
+    resetCarousel();
+  };
+  renderCarousel();
+  updateCarousel();
+  startCarousel();
+  document.getElementById("carousel").onmouseenter = stopCarousel;
+  document.getElementById("carousel").onmouseleave = startCarousel;
+
+  // Tab navigation
+  function switchTab(tab) {
+    const tabs = ["alertsTab", "postTab", "prevTab", "leaderboardTab"];
+    tabs.forEach((id) => {
+      const el = document.getElementById(id);
+      if (id === tab) {
+        el.classList.remove("hidden");
+        el.style.display = "";
+      } else {
+        el.classList.add("hidden");
+        el.style.display = "none";
+      }
+    });
+    if (tab === "alertsTab") {
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 100);
+    }
+  }
+  document.getElementById("btnAlerts").onclick = () => switchTab("alertsTab");
+  document.getElementById("btnPost").onclick = () => switchTab("postTab");
+  document.getElementById("btnPrev").onclick = () => switchTab("prevTab");
+  document.getElementById("btnLeaderboard").onclick = () => switchTab("leaderboardTab");
+  switchTab("alertsTab");
+
+  // Alert data
+  let alerts = [
+    {
+      id: 1,
+      type: "Cyclone",
+      icon: "🌪",
+      title: "Cyclone Warning: East Coastal Zone",
+      severity: "Critical",
+      status: "Verified",
+      time: "5 mins ago",
+      tips: "Evacuate when told. Secure your property.",
+      showTips: false,
+      lat: 11.107,
+      lng: 77.341,
+    },
+    {
+      id: 2,
+      type: "Power",
+      icon: "⚡",
+      title: "Power Outage: North Sector",
+      severity: "Warning",
+      status: "Pending",
+      time: "15 mins ago",
+      tips: "Use backup lights. Save device charge.",
+      showTips: false,
+      lat: 11.118,
+      lng: 77.348,
+    },
+    {
+      id: 3,
+      type: "Flood",
+      icon: "🌊",
+      title: "Flood Alert: West Sector",
+      severity: "Critical",
+      status: "Verified",
+      time: "12 mins ago",
+      tips: "Avoid river banks. Monitor weather.",
+      showTips: false,
+      lat: 11.102,
+      lng: 77.328,
+    },
+    {
+      id: 4,
+      type: "Bridge",
+      icon: "🛑",
+      title: "Bridge Collapse: River Bank",
+      severity: "Critical",
+      status: "Verified",
+      time: "20 mins ago",
+      tips: "Avoid crossing bridges. Seek alternate roads.",
+      showTips: false,
+      lat: 11.111,
+      lng: 77.332,
+    },
+  ];
+
+  // User management
+  let currentUser = localStorage.getItem("mySTUser") || null;
+  let users = JSON.parse(localStorage.getItem("users") || "{}");
+  if (currentUser && !users[currentUser]) users[currentUser] = 0;
+
+  // Show/hide broadcast button based on login
+  function updateNotifyBtn() {
+    const notifyBtn = document.getElementById('notifyBtn');
+    if (currentUser) {
+      notifyBtn.classList.remove('hidden');
+    } else {
+      notifyBtn.classList.add('hidden');
+    }
+  }
+
+  // Render alerts
+  function renderAlerts() {
+    let parent = document.getElementById("alertsList");
+    parent.innerHTML = "";
+    alerts.forEach((a, i) => {
+      let statusBadge = a.status === "Verified" ? "✅ Verified" : "❓ Unverified";
+      const statusBadgeClass = a.status === "Verified" ? 'bg-green-400 text-white' : 'bg-gray-400 text-white';
+      let alertCard = document.createElement("div");
+      alertCard.className = "relative bg-white dark:bg-gray-700 rounded-xl shadow-lg p-6 transition cursor-pointer";
+      alertCard.title = "Click to locate this alert on the map";
+      alertCard.innerHTML = `
+      <div class="flex flex-col gap-1 text-black dark:text-white">
+        <div class="text-xl font-bold text-red-700 dark:text-red-400">
+          ${a.severity === "Critical" ? "Critical Alert:" : "Alert:"} ${a.title}
+        </div>
+        <div><strong>Location:</strong> ${a.title.split(": ")[1] || a.title}</div>
+        <div>
+          <strong>Status:</strong> <span class="px-2 py-1 rounded ${statusBadgeClass}">${statusBadge}</span> | 
+          <strong>Severity:</strong> ${a.severity}
+        </div>
+        <button onclick="showTips(event,${i})" class="mt-1 px-2 py-1 rounded bg-blue-300 text-black font-bold text-sm">Tips</button>
+        <div class="prep-tips-panel" id="tips-${i}">${a.tips}</div>
+      </div>`;
+      alertCard.onclick = () => {
+        if (map) map.setView([a.lat, a.lng], 15);
+      };
+      parent.appendChild(alertCard);
+    });
+  }
+
+  // Show/hide tips panel
+  window.showTips = function(e, idx) {
+    e.stopPropagation();
+    const panel = document.getElementById(`tips-${idx}`);
+    panel.classList.toggle("prep-visible");
+  }
+
+  renderAlerts();
+
+  // Map setup
+  const map = L.map("map").setView([11.1085, 77.3411], 13);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+  }).addTo(map);
+  const markers = [];
+  alerts.forEach((a) => {
+    let icon = L.divIcon({ html: a.icon, className: "", iconSize: [32, 32] });
+    let m = L.marker([a.lat, a.lng], { icon }).addTo(map);
+    m.bindPopup(`<div><b>${a.title}</b><br>Severity: ${a.severity}<br>Status: ${a.status}</div>`);
+    markers.push(m);
+  });
+
+  // Leaderboard rendering
+  function renderLeaderboard() {
+    let list = document.getElementById("leaderboardList");
+    list.innerHTML = "";
+    const sorted = Object.entries(users)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const badges = [
+      { label: "🥇 Gold", color: "bg-yellow-400 text-black" },
+      { label: "🥈 Silver", color: "bg-gray-400 text-black" },
+      { label: "🥉 Bronze", color: "bg-yellow-700 text-white" },
+    ];
+
+    sorted.forEach(([name, pts], i) => {
+      const card = document.createElement("div");
+      card.className = `p-4 rounded shadow-md flex items-center gap-4 ${badges[i] ? badges[i].color : "bg-gray-700 text-white"}`;
+
+      const rank = document.createElement("div");
+      rank.textContent = i + 1;
+      rank.className = "text-2xl font-extrabold w-8 text-center";
+
+      const userName = document.createElement("div");
+      userName.textContent = name;
+      userName.className = "flex-grow font-bold text-lg";
+
+      const points = document.createElement("div");
+      points.textContent = `${pts} points`;
+      points.className = "font-semibold";
+
+      const badgeLabel = badges[i] ? badges[i].label : "";
+
+      const badge = document.createElement("div");
+      badge.textContent = badgeLabel;
+      badge.className = "ml-4 font-black text-lg";
+
+      card.appendChild(rank);
+      card.appendChild(userName);
+      card.appendChild(points);
+      card.appendChild(badge);
+
+      list.appendChild(card);
+    });
+  }
+  renderLeaderboard();
+
+  // Post new alert
+  document.getElementById("postBtn").onclick = () => {
+    if (!currentUser) return showToast("Login first!");
+    let newAlert = {
+      id: alerts.length + 1,
+      type: document.getElementById("alertType").value,
+      icon: "⚠",
+      title: document.getElementById("alertTitle").value,
+      severity: document.getElementById("alertSeverity").value,
+      status: "Pending",
+      time: "Just now",
+      tips: document.getElementById("alertTips").value,
+      showTips: false,
+      lat: 11.1085,
+      lng: 77.3411,
+    };
+    alerts.unshift(newAlert);
+    renderAlerts();
+    users[currentUser] += 1;
+    localStorage.setItem("users", JSON.stringify(users));
+    renderLeaderboard();
+    showToast("✅ Alert Posted!");
+  };
+
+  // Toast notification
+  function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.display = 'block';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+      toast.style.display = 'none';
+    }, 2000);
+  }
+
+  // Notification toggle logic
+  const notifToggleBtn = document.getElementById('notifToggleBtn');
+  notifToggleBtn.addEventListener('click', () => {
+    notificationsEnabled = !notificationsEnabled;
+    notifToggleBtn.textContent = notificationsEnabled ? '🔔 Notifications Enabled' : '🔕 Notifications Disabled';
+    showToast(notificationsEnabled ? "Notifications enabled" : "Notifications disabled");
+  });
+  let notificationsEnabled = true;
+
+  // Dark mode toggle
+  document.getElementById("darkToggle").onclick = () => {
+    document.body.classList.toggle("dark");
+  };
+
+  // Bulletin modal logic
+  const bulletinModal = document.getElementById("bulletinModal");
+  document.getElementById("bulletinBtn").onclick = () => bulletinModal.classList.remove("hidden");
+  document.getElementById("exitBulletin").onclick = () => bulletinModal.classList.add("hidden");
+
+  // Login modal logic
+  const loginModal = document.getElementById("loginModal");
+  document.getElementById("loginHeaderBtn").onclick = () => loginModal.classList.remove("hidden");
+  document.getElementById("loginBtn").onclick = () => {
+    const name = document.getElementById("loginName").value.trim();
+    if (!name) return showToast("Enter a name to login");
+    currentUser = name;
+    localStorage.setItem("mySTUser", name);
+    if (!users[name]) users[name] = 0;
+    localStorage.setItem("users", JSON.stringify(users));
+    showToast(`✅ Logged in as ${name}`);
+    loginModal.classList.add("hidden");
+    renderLeaderboard();
+    updateNotifyBtn();
+  };
+  document.getElementById("closeLogin").onclick = () => loginModal.classList.add("hidden");
+  if (!currentUser) loginModal.classList.remove("hidden");
+  updateNotifyBtn();
+
+  // Broadcast Notification logic
+  document.getElementById("notifyBtn").onclick = () => {
+    const message = prompt("Enter notification message:");
+    if (!message) return;
+    alerts.unshift({
+      id: alerts.length + 1,
+      type: "Notification",
+      icon: "🔔",
+      title: message,
+      severity: "All Clear",
+      status: "Verified",
+      time: "Just now",
+      tips: "This is a broadcast notification",
+      showTips: false,
+      lat: 11.1085,
+      lng: 77.3411,
+    });
+    const icon = L.divIcon({ html: "🔔", className: "", iconSize: [32, 32] });
+    const m = L.marker([11.1085, 77.3411], { icon }).addTo(map);
+    m.bindPopup(`<div><b>${message}</b></div>`);
+    markers.unshift(m);
+    showToast("🔔 Notification sent!");
+    renderAlerts();
+  };
+</script>
+</body>
+</html>
