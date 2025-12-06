@@ -47,7 +47,7 @@ SafeTown is an interactive, real-time alert dashboard that allows users to **vie
 
 | Component | Technology |
 |----------|------------|
-| Frontend | 💻 HTML5, Tailwind CSS, JavaScript |
+| Frontend | 💻 HTML, Tailwind CSS, JavaScript |
 | UI Design | Tailwind-based responsiveness |
 | Maps | 🗺 Leaflet.js |
 | Storage | LocalStorage (for users + leaderboard) |
